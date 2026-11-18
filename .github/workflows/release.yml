@@ -1,10 +1,9 @@
 name: Build and release plugin
 
+# Manual-only: this workflow never runs on push/tag/PR. Releases are built and
+# published locally (see README). Trigger from the Actions tab if ever needed.
 on:
-  push:
-    branches: ['**']
-    tags: ['v*']
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: write
