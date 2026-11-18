@@ -172,6 +172,11 @@ func handleMethod(method string, request []byte) []byte {
 	case "model.register", "model.static", "model.for_auth":
 		return modelsJSON()
 
+	// --- response normalization: flatten Mistral's thinking-chunk content
+	//     into content + reasoning_content (ported from cpa-mistral-normalizer) ---
+	case "response.normalize_before":
+		return handleNormalizeBefore(request)
+
 	// --- management page intentionally hidden: the Vibe Code / API allowance
 	//     now appears in the native Quota Management page via quota_provider,
 	//     so no separate sidebar menu is registered. ---
@@ -190,8 +195,8 @@ func registrationJSON(schemaVersion uint32) []byte {
 		"metadata": map[string]any{
 			"Name":             "Mistral Vibe",
 			"Version":          pluginVersion,
-			"Author":           "duck",
-			"GitHubRepository": "https://github.com/duckling/mistral-usage",
+			"Author":           "duchm1606",
+			"GitHubRepository": "https://github.com/duchm1606/cpa-mistral-vibe",
 			"Logo":             logoDataURI,
 			"ConfigFields": []map[string]string{
 				{"Name": "api-key", "Type": "string", "Description": "Mistral key (mstrl_...). Leave empty to auto-detect from the CPA config file."},
@@ -199,10 +204,11 @@ func registrationJSON(schemaVersion uint32) []byte {
 			},
 		},
 		"capabilities": map[string]any{
-			"auth_provider":   true,
-			"quota_provider":  true,
-			"management_api":  true,
-			"model_registrar": true,
+			"auth_provider":             true,
+			"quota_provider":            true,
+			"management_api":            true,
+			"model_registrar":           true,
+			"response_before_translator": true,
 		},
 	})
 }
