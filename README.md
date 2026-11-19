@@ -68,10 +68,13 @@ on. **This plugin handles all of them automatically — no config, no extra
 plugin.** Everything below is scoped to this plugin's own Mistral models, so
 other providers (codex, claude, …) are never touched.
 
-**Request** fixes (via the `request_interceptor` capability):
+**Request** fixes (via the `request_interceptor` and `request_normalizer`
+capabilities, so they apply to both Chat Completions and Responses-API clients
+such as Codex):
 
 - `developer` role → `system` (Mistral rejects `developer`).
-- `reasoning_effort: medium` → `high` (most Mistral models reject `medium`).
+- `reasoning_effort: medium` / `reasoning.effort: medium` → `high` (most
+  Mistral models reject `medium`).
 - Drop `reasoning_content` from assistant history (Mistral 422s on it).
 
 **Response** fix (via the `response_before_translator` capability): when a model

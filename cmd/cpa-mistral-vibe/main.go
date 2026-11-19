@@ -183,6 +183,10 @@ func handleMethod(method string, request []byte) []byte {
 		return handleInterceptBefore(request)
 	case "request.intercept_after":
 		return handleInterceptAfter(request)
+	// Same fixes on the translated provider payload — the only point where a
+	// Responses-API (Codex) request has become chat messages[].
+	case "request.normalize":
+		return handleRequestNormalize(request)
 
 	// --- management page intentionally hidden: the Vibe Code / API allowance
 	//     now appears in the native Quota Management page via quota_provider,
@@ -217,6 +221,7 @@ func registrationJSON(schemaVersion uint32) []byte {
 			"model_registrar":            true,
 			"response_before_translator": true,
 			"request_interceptor":        true,
+			"request_normalizer":         true,
 		},
 	})
 }

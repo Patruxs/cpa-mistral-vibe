@@ -44,6 +44,33 @@ func handleInterceptAfter(request []byte) []byte {
 	return mustOK(map[string]any{"Body": newBody})
 }
 
+// handleRequestNormalize is the request.normalize RPC (request_normalizer
+// capability). The host runs it AFTER translating the client payload into the
+// provider format, so Body is the final OpenAI chat-completions request even
+// when the client spoke the Responses API (Codex). request.intercept_after
+// cannot cover that case: it sees the untranslated source payload (input[]),
+// so a Responses "developer" item reached Mistral and was rejected with 422.
+func handleRequestNormalize(request []byte) []byte {
+	var req struct {
+		FromFormat string
+		ToFormat   string
+		Model      string
+		Stream     bool
+		Body       []byte
+	}
+	if err := json.Unmarshal(request, &req); err != nil {
+		return mustOK(payloadResponse{})
+	}
+	if req.ToFormat != "openai" || !isMistralModel(req.Model) {
+		return mustOK(payloadResponse{}) // not ours: keep untouched
+	}
+	newBody, changed := applyRequestFixes(req.Body)
+	if !changed {
+		return mustOK(payloadResponse{})
+	}
+	return mustOK(payloadResponse{Body: newBody})
+}
+
 // isMistralModel reports whether a model id is one this plugin serves.
 func isMistralModel(model string) bool {
 	m := baseModel(model)
@@ -98,6 +125,26 @@ func applyRequestFixes(payload []byte) ([]byte, bool) {
 	if eff, _ := doc["reasoning_effort"].(string); eff == "medium" {
 		doc["reasoning_effort"] = "high"
 		changed = true
+	}
+	// Responses-API source payload (Codex): reasoning.effort is read by the
+	// host's thinking pipeline, which applies it AFTER request.normalize, so it
+	// must be rewritten here in the untranslated body (request.intercept_after).
+	if r, ok := doc["reasoning"].(map[string]any); ok {
+		if eff, _ := r["effort"].(string); eff == "medium" {
+			r["effort"] = "high"
+			changed = true
+		}
+	}
+	// Responses-API input items: developer -> system, mirroring messages[].
+	if items, ok := doc["input"].([]any); ok {
+		for _, it := range items {
+			if m, _ := it.(map[string]any); m != nil {
+				if role, _ := m["role"].(string); role == "developer" {
+					m["role"] = "system"
+					changed = true
+				}
+			}
+		}
 	}
 	if !changed {
 		return nil, false
