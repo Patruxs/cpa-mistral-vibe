@@ -63,45 +63,24 @@ The provider key is `mistral`; credentials are `mistral-*.json` auth files.
 
 ## Normalization
 
-**Responses are normalized by this plugin — no extra plugin needed.** When a
-Mistral model reasons it returns `content` as a list of thinking/text chunks;
-the plugin flattens that into a `content` string plus a `reasoning_content`
-string (streaming and non-streaming), and strips Mistral's non-standard
-`response_error`. This logic is ported from
+Mistral's chat API has a few quirks that OpenAI-shaped clients (e.g. Codex) trip
+on. **This plugin handles all of them automatically — no config, no extra
+plugin.** Everything below is scoped to this plugin's own Mistral models, so
+other providers (codex, claude, …) are never touched.
+
+**Request** fixes (via the `request_interceptor` capability):
+
+- `developer` role → `system` (Mistral rejects `developer`).
+- `reasoning_effort: medium` → `high` (most Mistral models reject `medium`).
+- Drop `reasoning_content` from assistant history (Mistral 422s on it).
+
+**Response** fix (via the `response_before_translator` capability): when a model
+reasons, Mistral returns `content` as a list of thinking/text chunks; the plugin
+flattens it into a `content` string plus a `reasoning_content` string (streaming
+and non-streaming) and strips Mistral's non-standard `response_error`. This logic
+is ported from
 [`cpa-mistral-normalizer`](https://github.com/Batuhan4/cpa-mistral-normalizer)
-(MIT, © batuhan4) and only touches list-shaped OpenAI-format responses, so
-non-Mistral traffic is a no-op. You do **not** need to install that plugin.
-
-Three **request**-side quirks remain, which stock CPA payload rules handle,
-keyed on the model name. Add them once if your clients (e.g. Codex) hit them —
-the patterns below cover every Mistral model family:
-
-```yaml
-requests:
-  payload:
-    override:
-      # developer role -> system (Mistral rejects "developer")
-      - models: [{name: "deepseek-*"}, {name: "zai-glm-*"}, {name: "glm-*"},
-                 {name: "mistral-*"}, {name: "magistral-*"}, {name: "ministral-*"},
-                 {name: "codestral*"}, {name: "voxtral-*"}]
-        params: {'messages.#(role=="developer")#.role': "system"}
-      # reasoning_effort medium -> high (most models reject "medium")
-      - models: [{name: "deepseek-*", match: [{reasoning_effort: "medium"}]},
-                 {name: "zai-glm-*",  match: [{reasoning_effort: "medium"}]},
-                 {name: "glm-*",       match: [{reasoning_effort: "medium"}]},
-                 {name: "mistral-*",   match: [{reasoning_effort: "medium"}]},
-                 {name: "magistral-*", match: [{reasoning_effort: "medium"}]},
-                 {name: "ministral-*", match: [{reasoning_effort: "medium"}]},
-                 {name: "codestral*",  match: [{reasoning_effort: "medium"}]},
-                 {name: "voxtral-*",   match: [{reasoning_effort: "medium"}]}]
-        params: {reasoning_effort: "high"}
-    filter:
-      # drop reasoning_content from history (Mistral 422s on it)
-      - models: [{name: "deepseek-*"}, {name: "zai-glm-*"}, {name: "glm-*"},
-                 {name: "mistral-*"}, {name: "magistral-*"}, {name: "ministral-*"},
-                 {name: "codestral*"}, {name: "voxtral-*"}]
-        params: ['messages.#(role=="assistant")#.reasoning_content']
-```
+(MIT, © batuhan4); you do **not** need to install that plugin.
 
 ## Caveats
 

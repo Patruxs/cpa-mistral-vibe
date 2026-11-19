@@ -177,6 +177,13 @@ func handleMethod(method string, request []byte) []byte {
 	case "response.normalize_before":
 		return handleNormalizeBefore(request)
 
+	// --- request fixes (scoped to our Mistral models): developer->system,
+	//     reasoning_effort medium->high, drop assistant reasoning_content ---
+	case "request.intercept_before":
+		return handleInterceptBefore(request)
+	case "request.intercept_after":
+		return handleInterceptAfter(request)
+
 	// --- management page intentionally hidden: the Vibe Code / API allowance
 	//     now appears in the native Quota Management page via quota_provider,
 	//     so no separate sidebar menu is registered. ---
@@ -204,11 +211,12 @@ func registrationJSON(schemaVersion uint32) []byte {
 			},
 		},
 		"capabilities": map[string]any{
-			"auth_provider":             true,
-			"quota_provider":            true,
-			"management_api":            true,
-			"model_registrar":           true,
+			"auth_provider":              true,
+			"quota_provider":             true,
+			"management_api":             true,
+			"model_registrar":            true,
 			"response_before_translator": true,
+			"request_interceptor":        true,
 		},
 	})
 }
