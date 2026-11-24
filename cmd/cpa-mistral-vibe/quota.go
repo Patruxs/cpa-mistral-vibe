@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
 )
 
 func handleQuotaFetch(request []byte) []byte {
@@ -42,13 +44,10 @@ func handleQuotaFetch(request []byte) []byte {
 			metric("vibe_total", "Vibe Code allowance", budget.VibeBudget.InitialBudget),
 			metric("api_used", "API used", budget.APIBudget.used()),
 		},
-		"groups": []map[string]any{{
-			"displayName": "Monthly allowance",
-			"buckets": []map[string]any{
-				bucket("Vibe Code", budget.VibeBudget),
-				bucket("API", budget.APIBudget),
-			},
-		}},
+		"groups": []map[string]any{
+			group("Vibe Code", budget.VibeBudget),
+			group("API", budget.APIBudget),
+		},
 	}
 	return mustOK(resp)
 }
@@ -63,7 +62,7 @@ func metric(key, label string, value float64) map[string]any {
 	}
 }
 
-func bucket(window string, p budgetPool) map[string]any {
+func group(name string, p budgetPool) map[string]any {
 	remaining := 1 - p.UsagePercentage/100
 	if remaining < 0 {
 		remaining = 0
@@ -75,12 +74,22 @@ func bucket(window string, p budgetPool) map[string]any {
 	if cur == "" {
 		cur = "USD"
 	}
-	return map[string]any{
-		"window":            window,
-		"remainingFraction": remaining,
-		"resetTime":         p.ResetAt,
-		"description":       fmt.Sprintf("%s of %s used", money(p.used(), cur), money(p.InitialBudget, cur)),
+	used, total := money(p.used(), cur), money(p.InitialBudget, cur)
+	g := map[string]any{
+		"displayName": name,
+		"buckets": []map[string]any{{
+			"bucketId":          strings.ToLower(strings.ReplaceAll(name, " ", "-")),
+			"displayName":       used + " / " + total,
+			"remainingFraction": remaining,
+			"description":       fmt.Sprintf("%s of %s used", used, total),
+		}},
 	}
+	if reset, err := time.Parse(time.RFC3339, p.ResetAt); err == nil {
+		reset = reset.UTC()
+		g["displayName"] = name + " · resets " + reset.Format("Jan 2")
+		g["description"] = "Resets " + reset.Format("2006-01-02 15:04") + " UTC"
+	}
+	return g
 }
 
 func round2(v float64) float64 {
