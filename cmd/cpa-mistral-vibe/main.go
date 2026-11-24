@@ -209,7 +209,7 @@ func registrationJSON(schemaVersion uint32) []byte {
 			"Name":             "Mistral Vibe",
 			"Version":          pluginVersion,
 			"Author":           "duchm1606",
-			"GitHubRepository": "https://github.com/duchm1606/cpa-mistral-vibe",
+			"GitHubRepository": "https://github.com/Patruxs/cpa-mistral-vibe",
 			"Logo":             logoDataURI,
 			"ConfigFields": []map[string]string{
 				{"Name": "api-key", "Type": "string", "Description": "Mistral key (mstrl_...). Leave empty to auto-detect from the CPA config file."},
