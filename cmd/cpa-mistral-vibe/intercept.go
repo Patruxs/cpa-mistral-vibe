@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -97,9 +99,20 @@ func baseModel(model string) string {
 
 // applyRequestFixes rewrites an OpenAI chat-completions body in place. Returns
 // (body, false) when nothing matched so the host keeps the original bytes.
+// Scoping is by model-id string alone (see isMistralModel): if another
+// credential serves the same Mistral model ids, those requests get the
+// metadata block too.
 func applyRequestFixes(payload []byte) ([]byte, bool) {
 	var doc map[string]any
-	if err := json.Unmarshal(payload, &doc); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(payload))
+	dec.UseNumber() // keep number literals exact: >2^53 ints, 1.0
+	if err := dec.Decode(&doc); err != nil {
+		return nil, false
+	}
+	// doc == nil: a literal "null" decodes with no error, but writing to a
+	// nil map panics. Second Decode: reject trailing tokens after the first
+	// JSON value, matching json.Unmarshal.
+	if doc == nil || dec.Decode(&struct{}{}) != io.EOF {
 		return nil, false
 	}
 	changed := false

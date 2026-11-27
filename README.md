@@ -147,7 +147,9 @@ Trade-offs of turning it on:
 - Every request body gets a Vibe telemetry `metadata` block
   (`call_source=vibe_code`, a per-process `session_id`, …) so Mistral bills the
   Vibe Code allowance instead of `api_budget`; client-sent `metadata` keys are
-  preserved but these billing keys always win.
+  preserved but these billing keys always win. Scoping is by model id only — if
+  another credential serves the same Mistral models, its requests carry the
+  block too.
 - Sharing a Mistral subscription through Vibe for programmatic use may be subject
   to Mistral's terms; use your own account.
 

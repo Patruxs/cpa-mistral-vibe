@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -87,5 +88,44 @@ func TestVibeMetadataReplacesWrongType(t *testing.T) {
 func TestApplyRequestFixesInvalidJSON(t *testing.T) {
 	if out, changed := applyRequestFixes([]byte(`{"messages":`)); changed || out != nil {
 		t.Errorf("invalid JSON: got changed=%v out=%s, want false/nil", changed, out)
+	}
+}
+
+func TestApplyRequestFixesNonObjectJSON(t *testing.T) {
+	for _, body := range []string{
+		`null`,
+		`  null  `,
+		`[]`,
+		`"x"`,
+		`{"a":1} x`,
+		`{"a":1}}`,
+		`{"a":1} {}`,
+	} {
+		if out, changed := applyRequestFixes([]byte(body)); changed || out != nil {
+			t.Errorf("%s: got changed=%v out=%s, want false/nil", body, changed, out)
+		}
+	}
+}
+
+func TestApplyRequestFixesPreservesNumberLiterals(t *testing.T) {
+	body := []byte(`{"model":"mistral-small-latest","seed":1234567890123456789,"messages":[]}`)
+	out, changed := applyRequestFixes(body)
+	if !changed {
+		t.Fatal("a body without metadata should change")
+	}
+	if !strings.Contains(string(out), `"seed":1234567890123456789`) {
+		t.Errorf("seed literal lost precision: %s", out)
+	}
+	if meta := metadataIn(t, out); meta["call_source"] != "vibe_code" {
+		t.Errorf("call_source = %v", meta["call_source"])
+	}
+
+	body = []byte(`{"t":1.0}`)
+	out, changed = applyRequestFixes(body)
+	if !changed {
+		t.Fatal("a body without metadata should change")
+	}
+	if !strings.Contains(string(out), `"t":1.0`) {
+		t.Errorf("float literal not preserved: %s", out)
 	}
 }
