@@ -144,6 +144,10 @@ Trade-offs of turning it on:
 - A fresh sign-in creates a credential keyed by the key's hash (no stable
   account id is available), so re-logging in the same account adds a new entry —
   delete the old one if it duplicates.
+- Every request body gets a Vibe telemetry `metadata` block
+  (`call_source=vibe_code`, a per-process `session_id`, …) so Mistral bills the
+  Vibe Code allowance instead of `api_budget`; client-sent `metadata` keys are
+  preserved but these billing keys always win.
 - Sharing a Mistral subscription through Vibe for programmatic use may be subject
   to Mistral's terms; use your own account.
 

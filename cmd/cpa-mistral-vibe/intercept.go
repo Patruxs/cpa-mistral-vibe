@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"strings"
 )
 
@@ -14,6 +16,7 @@ import (
 //   - developer role        -> system        (Mistral rejects "developer")
 //   - reasoning_effort medium -> high         (most Mistral models reject "medium")
 //   - drop assistant reasoning_content         (Mistral 422s on it in history)
+//   - inject metadata Vibe telemetry block     (billing: vibe_budget, else 402)
 //   - optional, off by default: cap images per request (images.go)
 
 type interceptRequest struct {
@@ -145,6 +148,22 @@ func applyRequestFixes(payload []byte) ([]byte, bool) {
 			}
 		}
 	}
+	// Mistral bills api_budget (402 once exhausted) unless the body carries
+	// the Vibe telemetry block. Merge it so client-supplied metadata keys
+	// survive but the billing routing keys always win; a metadata field that
+	// is not a JSON object is replaced entirely.
+	meta, _ := doc["metadata"].(map[string]any)
+	if meta == nil {
+		meta = map[string]any{}
+		doc["metadata"] = meta
+		changed = true
+	}
+	for k, v := range vibeMetadata() {
+		if meta[k] != v {
+			meta[k] = v
+			changed = true
+		}
+	}
 	if !changed {
 		return nil, false
 	}
@@ -153,4 +172,31 @@ func applyRequestFixes(payload []byte) ([]byte, bool) {
 		return nil, false
 	}
 	return out, true
+}
+
+// vibeSessionID mimics a vibe CLI session: one uuid per plugin process.
+var vibeSessionID = newUUID()
+
+// vibeMetadata is the exact telemetry block a Vibe client sends; proven live
+// to route billing to vibe_budget (200 + usage delta) instead of api_budget.
+func vibeMetadata() map[string]any {
+	return map[string]any{
+		"agent_entrypoint": "programmatic",
+		"client_name":      "vibe_programmatic",
+		"call_source":      "vibe_code",
+		"call_type":        "main_call",
+		"host_kind":        "local",
+		"user_plan":        "individual",
+		"session_id":       vibeSessionID,
+		"version":          "3.1.3",
+	}
+}
+
+// newUUID returns a random v4 uuid, stdlib only.
+func newUUID() string {
+	var b [16]byte
+	_, _ = rand.Read(b[:])
+	b[6] = b[6]&0x0f | 0x40
+	b[8] = b[8]&0x3f | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
