@@ -108,9 +108,12 @@ func TestParseConfigImageCap(t *testing.T) {
 func TestImageCapOffByDefault(t *testing.T) {
 	withConfig(t, defaultConfig())
 	body := chatBody(t, 25)
-	if out, changed := applyRequestFixes(body); changed {
-		kept, _ := imagesIn(t, out)
-		t.Fatalf("cap is off but the body changed; %d images left", len(kept))
+	out, _ := applyRequestFixes(body)
+	if out == nil {
+		out = body
+	}
+	if kept, notes := imagesIn(t, out); len(kept) != 25 || notes != 0 {
+		t.Fatalf("cap is off but images changed; kept %d with %d notes", len(kept), notes)
 	}
 }
 
